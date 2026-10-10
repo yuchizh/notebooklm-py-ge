@@ -84,13 +84,24 @@ import argparse
 import json
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
 
-# The NotebookLM web app's gstatic JS namespace. If Google renames the app this
-# pattern must be updated (the script will then report "no bundle URL").
+# The NotebookLM web app's gstatic JS namespace. The consumer app and the Gemini
+# Enterprise app (``boq-cloud-ml-notebooklm-ui``, served from
+# ``notebook.cloud.google.com/<region>/``) ship separate bundles under separate
+# namespaces; ``--app`` picks which one to scrape. If Google renames an app this
+# default must be updated (the script will then report "no bundle URL").
 _APP = "boq-labs-tailwind"
-_BUNDLE_URL_RE = re.compile(rf'https://www\.gstatic\.com/_/mss/{_APP}/_/js/[^"\\\s<>]+')
+
+
+def bundle_url_re(app: str) -> re.Pattern[str]:
+    """The homepage-scrape pattern for one gstatic app namespace."""
+    return re.compile(rf'https://www\.gstatic\.com/_/mss/{re.escape(app)}/_/js/[^"\\\s<>]+')
+
+
+_BUNDLE_URL_RE = bundle_url_re(_APP)
 
 # A registration's two stable, quoted anchors: the ``/Service.Method`` path and
 # the rpc id. Quote-agnostic (``"`` or ``'``) so a change in the bundle
@@ -561,19 +572,22 @@ def extract_proto_assertions(bundle: str) -> set[tuple[str, str]]:
     return set(_PROTO_ASSERTION_RE.findall(bundle))
 
 
-def fetch_bundle() -> str:
+def fetch_bundle(app: str = _APP, urls: Sequence[str] | None = None) -> str:
     """Fetch and concatenate the gstatic app-bundle chunks (which carry the registry).
 
     One authenticated homepage read discovers the bundle URLs; the chunks are then
     fetched unauthenticated from the public CDN, **sequentially** (to avoid rate
     limiting) and **concatenated**, so the scan covers the whole frontend surface
     regardless of how Google splits the registry across chunks.
+
+    ``urls`` supplies those chunk URLs directly and skips the authenticated
+    homepage read entirely. A gstatic bundle URL carries no credentials, so it can
+    be read off a signed-in browser and handed to a host that has no session —
+    the route for the Gemini Enterprise app, whose homepage needs a seated account.
     """
     import httpx
 
-    from notebooklm._auth.extraction import _safe_url, _url_only_extraction_failure
-    from notebooklm._env import get_base_url
-    from notebooklm.auth import authuser_query, build_httpx_cookies_from_storage
+    from notebooklm._auth.extraction import _safe_url
 
     def _fetch(
         url: str,
@@ -592,59 +606,70 @@ def fetch_bundle() -> str:
         response.raise_for_status()
         return response
 
-    # Domain-preserving jar, NOT the flat ``load_auth_from_storage()`` mapping:
-    # a plain ``dict`` handed to ``httpx.get(cookies=...)`` carries no domain, so
-    # every cookie is sent to every host in the redirect chain. Host-scoped
-    # cookies (``OSID`` on the NotebookLM host, ``LSID`` on
-    # ``accounts.google.com``) leaking across hosts dead-ends the post-cutover
-    # sign-in chain on ``accounts.google.com/CookieMismatch`` — see issue #2019.
-    try:
-        cookies = build_httpx_cookies_from_storage()
-    except Exception as exc:
-        # This is a process-boundary diagnostic: malformed/missing storage,
-        # failed PSIDTS healing, and other credential-loader faults all mean
-        # "bundle unreadable", never "RPC ids disappeared". Keep the detail
-        # type-only so an exception cannot echo credential-shaped input.
-        raise _BundleAuthenticationError(
-            "Stored authentication could not be loaded "
-            f"({type(exc).__name__}). Run `notebooklm login` and retry."
-        ) from exc
-    try:
-        homepage = _fetch(
-            f"{get_base_url()}/?{authuser_query(0)}",
-            cookies=cookies,
-            follow_redirects=True,
-            timeout=30.0,
-        )
-    except httpx.HTTPStatusError as exc:
-        raise _BundleInfrastructureError(
-            "Authenticated homepage returned "
-            f"HTTP {exc.response.status_code} at {_safe_url(str(exc.request.url))}."
-        ) from exc
-    except httpx.RequestError as exc:
-        raise _BundleInfrastructureError(
-            "Authenticated homepage request failed with "
-            f"{type(exc).__name__} at {_safe_url(str(exc.request.url))}."
-        ) from exc
-    failure = _url_only_extraction_failure(
-        str(homepage.url),
-        [str(response.url) for response in homepage.history],
-    )
-    if failure is not None:
-        raise _BundleAuthenticationError(str(failure)) from failure
+    if urls is not None:
+        # Caller-supplied chunk URLs: no session needed, so the whole
+        # authenticated-homepage path below is skipped.
+        chunk_urls = sorted(set(urls))
+        if not chunk_urls:
+            raise _BundleInfrastructureError("No bundle URL supplied via --bundle-url.")
+    else:
+        from notebooklm._auth.extraction import _url_only_extraction_failure
+        from notebooklm._env import get_base_url
+        from notebooklm.auth import authuser_query, build_httpx_cookies_from_storage
 
-    html = homepage.text
-    urls = sorted(set(_BUNDLE_URL_RE.findall(html)))
-    if not urls:
-        raise _BundleInfrastructureError(
-            f"No {_APP} bundle URL found in the homepage — not authenticated for "
-            "NotebookLM? Run `notebooklm login` (or pass --bundle-file)."
+        # Domain-preserving jar, NOT the flat ``load_auth_from_storage()`` mapping:
+        # a plain ``dict`` handed to ``httpx.get(cookies=...)`` carries no domain, so
+        # every cookie is sent to every host in the redirect chain. Host-scoped
+        # cookies (``OSID`` on the NotebookLM host, ``LSID`` on
+        # ``accounts.google.com``) leaking across hosts dead-ends the post-cutover
+        # sign-in chain on ``accounts.google.com/CookieMismatch`` — see issue #2019.
+        try:
+            cookies = build_httpx_cookies_from_storage()
+        except Exception as exc:
+            # This is a process-boundary diagnostic: malformed/missing storage,
+            # failed PSIDTS healing, and other credential-loader faults all mean
+            # "bundle unreadable", never "RPC ids disappeared". Keep the detail
+            # type-only so an exception cannot echo credential-shaped input.
+            raise _BundleAuthenticationError(
+                "Stored authentication could not be loaded "
+                f"({type(exc).__name__}). Run `notebooklm login` and retry."
+            ) from exc
+        try:
+            homepage = _fetch(
+                f"{get_base_url()}/?{authuser_query(0)}",
+                cookies=cookies,
+                follow_redirects=True,
+                timeout=30.0,
+            )
+        except httpx.HTTPStatusError as exc:
+            raise _BundleInfrastructureError(
+                "Authenticated homepage returned "
+                f"HTTP {exc.response.status_code} at {_safe_url(str(exc.request.url))}."
+            ) from exc
+        except httpx.RequestError as exc:
+            raise _BundleInfrastructureError(
+                "Authenticated homepage request failed with "
+                f"{type(exc).__name__} at {_safe_url(str(exc.request.url))}."
+            ) from exc
+        failure = _url_only_extraction_failure(
+            str(homepage.url),
+            [str(response.url) for response in homepage.history],
         )
+        if failure is not None:
+            raise _BundleAuthenticationError(str(failure)) from failure
+
+        html = homepage.text
+        chunk_urls = sorted(set(bundle_url_re(app).findall(html)))
+        if not chunk_urls:
+            raise _BundleInfrastructureError(
+                f"No {app} bundle URL found in the homepage — not authenticated for "
+                "NotebookLM? Run `notebooklm login` (or pass --bundle-file/--bundle-url)."
+            )
     # Keep only genuine JS responses: raise_for_status rejects non-200, and this
     # rejects a 200 served with the wrong content-type (e.g. an HTML login/error
     # page), which would otherwise be parsed as a bundle and make every id ABSENT.
     bodies: list[str] = []
-    for url in urls:
+    for url in chunk_urls:
         try:
             response = _fetch(url)
         except httpx.HTTPStatusError as exc:
@@ -662,7 +687,7 @@ def fetch_bundle() -> str:
             bodies.append(response.text)
     if not bodies:
         raise _BundleInfrastructureError(
-            f"No readable JS bundle content fetched from the {_APP} URLs."
+            f"No readable JS bundle content fetched from the {app} URLs."
         )
     return "\n".join(bodies)
 
@@ -849,6 +874,24 @@ def main(argv: list[str] | None = None) -> int:
         help="fetch the live bundle, save it to this path, and analyse it",
     )
     parser.add_argument(
+        "--app",
+        default=_APP,
+        help=(
+            "gstatic app namespace to scrape from the homepage "
+            f"(default: {_APP}; Gemini Enterprise: boq-cloud-ml-notebooklm-ui)"
+        ),
+    )
+    parser.add_argument(
+        "--bundle-url",
+        action="append",
+        metavar="URL",
+        help=(
+            "fetch these gstatic chunk URLs directly and skip the authenticated "
+            "homepage read (repeatable); gstatic URLs carry no credentials, so they "
+            "can be read off a signed-in browser and used from a host with no session"
+        ),
+    )
+    parser.add_argument(
         "--types",
         type=Path,
         default=_DEFAULT_TYPES,
@@ -863,6 +906,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     args = parser.parse_args(argv)
+    if args.bundle_url and args.bundle_file:
+        parser.error("--bundle-url and --bundle-file are mutually exclusive")
     if args.outcome_file is not None:
         args.outcome_file.unlink(missing_ok=True)
 
@@ -880,7 +925,9 @@ def main(argv: list[str] | None = None) -> int:
     ours = parse_ids_from_text(types_text)
     try:
         bundle = (
-            args.bundle_file.read_text(encoding="utf-8") if args.bundle_file else fetch_bundle()
+            args.bundle_file.read_text(encoding="utf-8")
+            if args.bundle_file
+            else fetch_bundle(args.app, args.bundle_url)
         )
         if args.save_bundle is not None:
             args.save_bundle.write_text(bundle, encoding="utf-8")

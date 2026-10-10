@@ -1849,7 +1849,7 @@ def test_base_url_override_accepts_personal_hosts(raw: str) -> None:
 @pytest.mark.parametrize(
     "raw",
     [
-        "https://notebooklm.cloud.google.com",  # enterprise: different tenant model
+        "https://notebook.cloud.google.com/us",  # enterprise: different tenant model
         "http://notebook.google.com",  # not https
         "https://evil.example.com",
         "https://notebook.google.com:8443",

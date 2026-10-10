@@ -2282,6 +2282,24 @@
     },
     {
       "kind": "from",
+      "lineno": 15,
+      "scope": null,
+      "scope_kind": "module",
+      "source": "notebooklm._app.enterprise",
+      "target": "notebooklm.enterprise",
+      "type_only": false
+    },
+    {
+      "kind": "from",
+      "lineno": 23,
+      "scope": null,
+      "scope_kind": "module",
+      "source": "notebooklm._app.enterprise",
+      "target": "notebooklm.exceptions",
+      "type_only": false
+    },
+    {
+      "kind": "from",
       "lineno": 60,
       "scope": null,
       "scope_kind": "module",
@@ -8429,6 +8447,33 @@
     },
     {
       "kind": "from",
+      "lineno": 32,
+      "scope": null,
+      "scope_kind": "module",
+      "source": "notebooklm.cli.enterprise_cmd",
+      "target": "notebooklm._app.enterprise",
+      "type_only": false
+    },
+    {
+      "kind": "from",
+      "lineno": 41,
+      "scope": null,
+      "scope_kind": "module",
+      "source": "notebooklm.cli.enterprise_cmd",
+      "target": "notebooklm.enterprise",
+      "type_only": false
+    },
+    {
+      "kind": "from",
+      "lineno": 42,
+      "scope": null,
+      "scope_kind": "module",
+      "source": "notebooklm.cli.enterprise_cmd",
+      "target": "notebooklm.exceptions",
+      "type_only": false
+    },
+    {
+      "kind": "from",
       "lineno": 15,
       "scope": null,
       "scope_kind": "module",
@@ -10544,7 +10589,7 @@
     },
     {
       "kind": "from",
-      "lineno": 120,
+      "lineno": 121,
       "scope": null,
       "scope_kind": "module",
       "source": "notebooklm.notebooklm_cli",
@@ -10553,7 +10598,7 @@
     },
     {
       "kind": "from",
-      "lineno": 218,
+      "lineno": 219,
       "scope": "cli",
       "scope_kind": "function",
       "source": "notebooklm.notebooklm_cli",
@@ -11359,27 +11404,27 @@
       "modules": 53
     },
     "app": {
-      "lines": 13245,
-      "modules": 40
+      "lines": 13384,
+      "modules": 41
     },
     "auth": {
-      "lines": 13745,
+      "lines": 13748,
       "modules": 33
     },
     "cli": {
-      "lines": 22795,
-      "modules": 76
+      "lines": 23058,
+      "modules": 77
     },
     "mcp": {
       "lines": 11055,
       "modules": 39
     },
     "root": {
-      "lines": 27115,
-      "modules": 90
+      "lines": 27943,
+      "modules": 95
     },
     "rpc": {
-      "lines": 385,
+      "lines": 403,
       "modules": 3
     },
     "runtime": {
@@ -11395,18 +11440,18 @@
       "modules": 18
     },
     "web": {
-      "lines": 33536,
+      "lines": 33538,
       "modules": 97
     }
   },
   "summary": {
-    "authored_lines": 150763,
-    "authored_modules": 479,
+    "authored_lines": 152016,
+    "authored_modules": 486,
     "class_local_edges": 0,
-    "cross_subsystem_edges": 1250,
+    "cross_subsystem_edges": 1255,
     "dynamic_import_calls": 10,
     "function_local_edges": 87,
-    "module_level_edges": 1163,
+    "module_level_edges": 1168,
     "type_only_edges": 133
   },
   "version": 1

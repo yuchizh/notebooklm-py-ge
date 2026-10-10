@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from typing import Any, Literal
 
 from notebooklm._env import (
+    ENTERPRISE_BASE_HOST,
     PERSONAL_APP_HOSTS,
     PERSONAL_BASE_HOST,
     PERSONAL_LEGACY_HOST,
@@ -492,8 +493,11 @@ REQUIRED_COOKIE_DOMAINS: frozenset[str] = frozenset(
         # not drop them at extraction / load time.
         f".{PERSONAL_BASE_HOST}",
         PERSONAL_BASE_HOST,
-        ".notebooklm.cloud.google.com",
-        "notebooklm.cloud.google.com",
+        # Gemini Notebook Enterprise. Derived from the constant rather than
+        # spelled out, so the host only has to be corrected in one place --
+        # these two lines named an unserved host until 2026-09-15.
+        f".{ENTERPRISE_BASE_HOST}",
+        ENTERPRISE_BASE_HOST,
         ".googleusercontent.com",
         "accounts.google.com",  # Required for token refresh + RotateCookies
         ".accounts.google.com",  # http.cookiejar may normalize Domain=accounts.google.com
@@ -806,7 +810,7 @@ def _auth_domain_priority(domain: str) -> int:
     wins, and reordering the file changes the result. The collisions are:
 
     - **tier 3** — ``.notebooklm.google.com``, ``.notebook.google.com``
-      (the Gemini Notebook rebrand host), ``.notebooklm.cloud.google.com``
+      (the Gemini Notebook rebrand host), ``.notebook.cloud.google.com``
     - **tier 2** — the three bare (no leading dot) variants of the above
     - **tier 0** — every allowlisted domain that is not a Google ccTLD:
       ``accounts.google.com``, ``drive.google.com``, ``.googleusercontent.com``,
@@ -839,9 +843,9 @@ def _auth_domain_priority(domain: str) -> int:
         return 3
     if domain == PERSONAL_BASE_HOST:
         return 2
-    if domain == ".notebooklm.cloud.google.com":
+    if domain == f".{ENTERPRISE_BASE_HOST}":
         return 3
-    if domain == "notebooklm.cloud.google.com":
+    if domain == ENTERPRISE_BASE_HOST:
         return 2
     if _is_google_domain(domain):
         return 1

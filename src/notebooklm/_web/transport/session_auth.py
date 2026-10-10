@@ -16,7 +16,7 @@ from ..._auth.recovery import (
 )
 from ..._auth.refresh import try_refresh_cmd_reauth
 from ..._auth.tokens import AuthTokens
-from ..._env import get_base_url
+from ..._env import get_app_shell_url
 from ..._request_policy import RequestPolicyOwner, request_scoped
 from ..._url_utils import is_google_auth_redirect
 from ...exceptions import AuthExtractionError
@@ -157,9 +157,11 @@ async def refresh_auth_session(
         nonlocal rejected_cookie_jar
         auth_coord.assert_epoch(expected_epoch)
         kernel.assert_epoch(expected_epoch)
-        url = f"{get_base_url()}/"
-        if auth.account_email or auth.authuser:
-            url = f"{url}?{authuser_query(auth.authuser, auth.account_email)}"
+        url = get_app_shell_url(
+            authuser_query(auth.authuser, auth.account_email)
+            if (auth.account_email or auth.authuser)
+            else None
+        )
         request_cookie_jar = CookieJar.from_httpx(http_client.cookies)
         response = await http_client.get(url)
         auth_coord.assert_epoch(expected_epoch)

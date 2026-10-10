@@ -663,7 +663,7 @@
       "path": "src/notebooklm/_auth/cookie_merge.py"
     },
     {
-      "lines": 909,
+      "lines": 913,
       "name": "cookie_policy",
       "path": "src/notebooklm/_auth/cookie_policy.py"
     },
@@ -763,7 +763,7 @@
       "path": "src/notebooklm/_auth/recovery_rungs.py"
     },
     {
-      "lines": 1182,
+      "lines": 1181,
       "name": "refresh",
       "path": "src/notebooklm/_auth/refresh.py"
     },
@@ -796,7 +796,7 @@
     "function_local_edges": 12,
     "module_edges": 112,
     "modules": 33,
-    "total_lines": 13745,
+    "total_lines": 13748,
     "unique_edges": 124
   },
   "version": 1

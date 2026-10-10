@@ -206,7 +206,8 @@ accepted for source compatibility but are ignored when Android is selected.
 | `NOTEBOOKLM_AUTH_JSON` | Inline authentication JSON (for CI/CD) | - |
 | `NOTEBOOKLM_NOTEBOOK` | Default notebook ID for commands without `-n/--notebook` | - |
 | `NOTEBOOKLM_HL` | Default interface/output language code (e.g. `en`, `ja`, `zh_Hans`) | `en` |
-| `NOTEBOOKLM_BASE_URL` | Gemini Notebook base URL. Constrained to `https://notebook.google.com` (default) or `https://notebooklm.google.com` (pre-rebrand personal, still served) or `https://notebooklm.cloud.google.com` (enterprise) | `https://notebook.google.com` |
+| `NOTEBOOKLM_BASE_URL` | Gemini Notebook base URL. Constrained to `https://notebook.google.com` (default) or `https://notebooklm.google.com` (pre-rebrand personal, still served) or `https://notebook.cloud.google.com/{us\|eu\|global}` (Gemini Enterprise — the region segment is **required**; the enterprise host root is not served) | `https://notebook.google.com` |
+| `NOTEBOOKLM_PROJECT_NUMBER` | Gemini Enterprise project **number** (digits only). Appended to the app-shell URL as `?project=…` when the base URL is the enterprise host; ignored on the personal hosts. Not part of the base URL, so it never leaks into RPC endpoints. | - |
 | `NOTEBOOKLM_BL` | `bl` (build label) URL parameter for the chat streaming endpoint; override when chasing a regression tied to a specific frontend build snapshot | built-in default in `_env.DEFAULT_BL` (drift-monitored nightly) |
 | `NOTEBOOKLM_TRANSPORT` | HTTP transport backend: `httpx` (default) or `curl_cffi` (opt-in browser-TLS impersonation; requires the `curl_cffi` package). Use `curl_cffi` where the default transport is TLS-fingerprint-blocked. | `httpx` |
 | `NOTEBOOKLM_LOG_LEVEL` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR` | `WARNING` |
@@ -258,10 +259,45 @@ defaults such as `DEFAULT_BL` for the chat streaming build label.
 
 `notebooklm.config` is the stable public import surface. It intentionally
 re-exports only the supported endpoint/language helpers:
-`DEFAULT_BASE_URL`, `ENTERPRISE_BASE_HOST`, `get_base_host`, `get_base_url`,
-`get_default_language`, and `PERSONAL_BASE_HOST`. Existing imports
+`DEFAULT_BASE_URL`, `ENTERPRISE_BASE_HOST`, `ENTERPRISE_REGIONS`,
+`get_app_shell_url`, `get_base_host`, `get_base_url`, `get_default_language`,
+`get_enterprise_project`, and `PERSONAL_BASE_HOST`. Existing imports
 from `notebooklm.config` remain supported; internal-only `_env` names should
 not be imported by downstream code.
+
+### Pointing the client at Gemini Enterprise
+
+Gemini Enterprise (Gemini Notebook on GCP) is the same product as the consumer
+and Workspace NotebookLM, served to a different tenancy from a different host.
+Two variables select it:
+
+```bash
+export NOTEBOOKLM_BASE_URL=https://notebook.cloud.google.com/us   # us | eu | global
+export NOTEBOOKLM_PROJECT_NUMBER=123456789012                     # optional
+notebooklm login --fresh
+```
+
+Three things about this host differ from the personal ones and are worth
+knowing before you debug a failure against it:
+
+- **The region segment is required.** `https://notebook.cloud.google.com` on its
+  own answers every path with a generic 404. Pick the multi-region your
+  notebooks actually live in; the segment is preserved into the base URL because
+  `batchexecute`, the streamed-chat path, and `/upload/_/` are all built by
+  appending a suffix to it.
+- **`?project=` is app-shell only.** It is attached by `get_app_shell_url()` —
+  the login / cookie-priming / token-scraping target — and never by
+  `get_base_url()`, since a query string in the base URL would corrupt every one
+  of those suffix joins.
+- **Enterprise tenancy is isolated.** Notebooks created in Workspace NotebookLM
+  are not visible here and cannot be migrated in-place; an enterprise tenant is
+  also pinned to its own upload host, so a resumable-upload URL naming a
+  consumer host is rejected rather than followed.
+
+Credentials are the ordinary end-user Google session: `/<region>/` redirects
+into the same `accounts.google.com` flow the personal hosts use, so
+`notebooklm login` drives it unchanged. A GCP **service account** is not a
+usable principal for this path.
 
 ### Bound Web request policy (additive preview)
 
@@ -352,7 +388,8 @@ be audited from one location.
 | `NOTEBOOKLM_QUIET_DEPRECATIONS` | Suppress the project's public-API `DeprecationWarning`s — the one-off warnings routed through `src/notebooklm/_deprecation.py::warn_deprecated` (e.g. awaiting `from_storage(...)`). Set to a truthy value (`1` / `true` / `yes` / `on`) to silence them. See `docs/deprecations.md`. | (warnings emitted) | `_deprecation._deprecations_quiet` / `deprecations_quiet` |
 | `NOTEBOOKLM_FUTURE_ERRORS` | **Retired (removed in v0.8.0; ignored).** It was the v0.7.0 forward-compat preview gate for the v0.8.0 error contract (ADR-0019 / umbrella [#1346](https://github.com/teng-lin/notebooklm-py/issues/1346)). Now that every break it staged — `get()` raising `*NotFoundError`, the attribute-only typed returns, the removed `interval=` alias, the bool→`None` returns, the refusal-raises, and the mutate-existing fail-loud — is the default, the flag is a **no-op**: setting it has no effect. See `docs/deprecations.md`. | (ignored) | — |
 | `NOTEBOOKLM_STRICT_DECODE` | **Retired (ignored since v0.7.0).** Strict decoding is the only mode — `safe_index` always raises `UnknownRPCMethodError` on schema drift. The former `0` warn-and-fallback opt-out was removed; setting the variable has no effect. | (ignored) | — |
-| `NOTEBOOKLM_BASE_URL` | Gemini Notebook base URL. Constrained to `https://notebook.google.com` (default) or `https://notebooklm.google.com` (pre-rebrand personal host, still served — the documented rollback lever; if auth fails after switching, re-run `notebooklm login --fresh`) or `https://notebooklm.cloud.google.com` (enterprise); other schemes/hosts/paths raise `ValueError`. | Process env on every base-URL lookup. | `_env.get_base_url` |
+| `NOTEBOOKLM_BASE_URL` | Gemini Notebook base URL. Constrained to `https://notebook.google.com` (default) or `https://notebooklm.google.com` (pre-rebrand personal host, still served — the documented rollback lever; if auth fails after switching, re-run `notebooklm login --fresh`) or `https://notebook.cloud.google.com/{us\|eu\|global}` (Gemini Enterprise); other schemes/hosts/paths raise `ValueError`. The enterprise host is the mirror image of the personal ones: it serves the app **only** from a region segment and answers its own root with a generic 404, so the region is required rather than optional and is preserved into the returned base URL (every RPC endpoint is built by appending a suffix to it). Until 2026-09-15 this variable documented `notebooklm.cloud.google.com`, a host that is not served at all. | Process env on every base-URL lookup. | `_env.get_base_url` |
+| `NOTEBOOKLM_PROJECT_NUMBER` | Gemini Enterprise project **number**, digits only (a project *ID* is rejected with `ValueError`). Appended to the app-shell URL as `?project=…`; ignored when the base URL is a personal host. Deliberately separate from `NOTEBOOKLM_BASE_URL` — folding a query string into the base URL would corrupt every endpoint suffix join. | Process env on every app-shell URL build. | `_env.get_enterprise_project` / `_env.get_app_shell_url` |
 | `NOTEBOOKLM_BL` | `bl` (build label) URL parameter sent on the chat streaming endpoint (`ChatAPI.ask`). Pins the frontend build the request is attributed to. The built-in `_env.DEFAULT_BL` is watched by the nightly canary's [build-label lane](rpc-development.md#build-label-lane-bl--_envdefault_bl), which compares it against the label Google actually serves; an override here does not change that verdict. | Process env on every chat stream call; whitespace-only falls back to `_env.DEFAULT_BL`. | `_env.get_default_bl` |
 | `NOTEBOOKLM_DEBUG` | When `1`, RPC error messages include the **full** untruncated response body instead of the default 80-char preview. Verbose; intended for deep debugging only. | Process env on each error formatting call. | `exceptions._truncate_response_preview` |
 | `NOTEBOOKLM_REFRESH_CMD` | Optional command invoked when auth refresh is required. Must exit `0` after writing a refreshed `storage_state.json`; the parent reloads cookies from disk. Stdout/stderr are not parsed (only surfaced in the non-zero-exit error message). Parsing honors `NOTEBOOKLM_REFRESH_CMD_USE_SHELL`. | Process env on each refresh subprocess spawn. | `auth` refresh-spawn helper (constant `NOTEBOOKLM_REFRESH_CMD_ENV` in `notebooklm.auth`) |

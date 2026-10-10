@@ -177,7 +177,7 @@ def is_notebooklm_app_host(url: str) -> bool:
 
     True for the consumer host (``notebooklm.google.com``), its post-rebrand
     alias (``notebook.google.com``), and the enterprise host
-    (``notebooklm.cloud.google.com``) — the hosts that can serve a page
+    (``notebook.cloud.google.com``) — the hosts that can serve a page
     containing ``WIZ_global_data``. Deliberately an exact-host match: the
     marketing/gate host ``notebooklm.google`` is a different host (no ``.com``)
     and must not qualify, and no subdomain of the app hosts serves the app

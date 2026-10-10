@@ -287,8 +287,11 @@ export NOTEBOOKLM_BASE_URL=https://notebook.google.com
 # Personal, pre-rebrand host (still served; rollback lever)
 export NOTEBOOKLM_BASE_URL=https://notebooklm.google.com
 
-# Enterprise
-export NOTEBOOKLM_BASE_URL=https://notebooklm.cloud.google.com
+# Enterprise (Gemini Enterprise). The region segment is REQUIRED — the host
+# root is not served. Region is one of us | eu | global and must match the
+# data-residency multi-region your notebooks live in.
+export NOTEBOOKLM_BASE_URL=https://notebook.cloud.google.com/us
+export NOTEBOOKLM_PROJECT_NUMBER=123456789012   # optional; app-shell ?project=
 ```
 
 Both personal hosts are documented values since #2067. `https://notebook.google.com` is the default and is what this project's cassettes now exercise; `https://notebooklm.google.com` remains served and is the supported rollback lever.
@@ -356,7 +359,7 @@ from notebooklm import NotebookLMClient
   request body `f.req` payload, so the wire format stays consistent.
 - The override is gated on the configured base host being a known Google
   NotebookLM endpoint (`notebook.google.com`, `notebooklm.google.com`, or
-  `notebooklm.cloud.google.com`). Overrides do NOT apply to non-Google
+  `notebook.cloud.google.com`). Overrides do NOT apply to non-Google
   hosts, so this env var cannot be weaponised to leak custom RPC IDs to a
   hostile endpoint.
 - Method names not listed in the override map continue to use the canonical

@@ -16,7 +16,7 @@ from typing import Any, Protocol
 
 import httpx
 
-from .._env import get_base_url
+from .._env import get_app_shell_url
 from .._request_context import has_bound_policy, policy_child_environment, policy_env, policy_key
 from ..paths import get_storage_path, resolve_profile
 from . import cookies as _auth_cookies
@@ -975,9 +975,8 @@ async def _fetch_tokens_with_jar(
         if poke:
             await _poke_session(client, storage_path)
 
-        url = f"{get_base_url()}/"
-        if account_email or authuser or force_authuser_query:
-            url = f"{url}?{authuser_query(authuser, account_email)}"
+        pin_authuser = account_email or authuser or force_authuser_query
+        url = get_app_shell_url(authuser_query(authuser, account_email) if pin_authuser else None)
         response = await client.get(
             url,
             follow_redirects=True,

@@ -18,7 +18,7 @@ from notebooklm.rpc import RPCMethod
 
 PERSONAL = "https://notebook.google.com"
 LEGACY = "https://notebooklm.google.com"
-ENTERPRISE = "https://notebooklm.cloud.google.com"
+ENTERPRISE = "https://notebook.cloud.google.com/us"
 HTML = '"SNlM0e":"fresh-csrf" "FdrFJe":"fresh-session"'
 
 

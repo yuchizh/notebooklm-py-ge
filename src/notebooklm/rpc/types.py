@@ -4,7 +4,7 @@ from enum import Enum  # noqa: F401 - historical wildcard re-export
 from typing import Any as _Any
 from typing import Final
 
-from .._env import DEFAULT_BASE_URL, get_base_url
+from .._env import DEFAULT_BASE_URL, get_base_url, is_enterprise_base
 from .._types.enums import (  # noqa: F401 - compatibility re-exports
     _ARTIFACT_STATUS_MAP,
     _DISCOVERY_MODE_MAP,
@@ -81,29 +81,47 @@ def __dir__() -> list[str]:
     return sorted({*globals(), *_LEGACY_OVERRIDE_EXPORTS})
 
 
+# The boq app name that owns the batchexecute endpoint. Personal/Workspace and
+# Gemini Enterprise run the same transport under different app names.
+_BOQ_APP: Final[str] = "LabsTailwindUi"
+_ENTERPRISE_BOQ_APP: Final[str] = "CloudNotebookLmUi"
+
 # URL path for the streamed-chat endpoint. Not a batchexecute RPC ID — kept
 # as a module-level constant rather than an ``RPCMethod`` member so the enum
 # only contains real RPC IDs that ``scripts/check_rpc_health.py`` can probe.
 _QUERY_ENDPOINT_PATH: Final[str] = (
-    "/_/LabsTailwindUi/data/google.internal.labs.tailwind.orchestration.v1."
+    f"/_/{_BOQ_APP}/data/google.internal.labs.tailwind.orchestration.v1."
     "LabsTailwindOrchestrationService/GenerateFreeFormStreamed"
+)
+# Enterprise serves chat from a different proto package, not just a different
+# app name: ``google.cloud.notebooklm.v1main`` is a separate schema from
+# ``labs.tailwind.orchestration.v1``, so request *shapes* may differ too.
+_ENTERPRISE_QUERY_ENDPOINT_PATH: Final[str] = (
+    f"/_/{_ENTERPRISE_BOQ_APP}/data/google.cloud.notebooklm.v1main."
+    "NotebookService/GenerateFreeFormStreamed"
 )
 
 # Backward-compatible default-host endpoint constants. Runtime code should use
 # the lazy get_* helpers below so NOTEBOOKLM_BASE_URL is honored after import.
-BATCHEXECUTE_URL = f"{DEFAULT_BASE_URL}/_/LabsTailwindUi/data/batchexecute"
+BATCHEXECUTE_URL = f"{DEFAULT_BASE_URL}/_/{_BOQ_APP}/data/batchexecute"
 QUERY_URL = f"{DEFAULT_BASE_URL}{_QUERY_ENDPOINT_PATH}"
 UPLOAD_URL = f"{DEFAULT_BASE_URL}/upload/_/"
 
 
+def get_boq_app() -> str:
+    """Return the boq app name owning the endpoints for the configured host."""
+    return _ENTERPRISE_BOQ_APP if is_enterprise_base() else _BOQ_APP
+
+
 def get_batchexecute_url() -> str:
     """Return the NotebookLM batchexecute endpoint for the configured host."""
-    return f"{get_base_url()}/_/LabsTailwindUi/data/batchexecute"
+    return f"{get_base_url()}/_/{get_boq_app()}/data/batchexecute"
 
 
 def get_query_url() -> str:
     """Return the NotebookLM streamed chat endpoint for the configured host."""
-    return f"{get_base_url()}{_QUERY_ENDPOINT_PATH}"
+    path = _ENTERPRISE_QUERY_ENDPOINT_PATH if is_enterprise_base() else _QUERY_ENDPOINT_PATH
+    return f"{get_base_url()}{path}"
 
 
 def get_upload_url() -> str:

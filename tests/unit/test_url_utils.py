@@ -343,7 +343,7 @@ class TestIsNotebookLMAppHost:
             "https://notebooklm.google.com/",
             "https://notebooklm.google.com/notebook/abc",
             "https://NotebookLM.Google.COM/",  # host comparison is case-insensitive
-            "https://notebooklm.cloud.google.com/",  # enterprise host
+            "https://notebook.cloud.google.com/",  # enterprise host
             # Post-rebrand personal alias. Omitting it would make a genuine app
             # response report as "the request never reached the app".
             "https://notebook.google.com/",

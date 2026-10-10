@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 
 import httpx
 
-from .._env import get_base_url
+from .._env import get_app_shell_url
 from .._url_utils import is_google_auth_redirect
 from .account_repair import _compose_account_repair_service
 from .account_types import Account, PlaywrightAccountRepairResult
@@ -93,7 +93,7 @@ async def _probe_authuser(client: httpx.AsyncClient, n: int) -> str | None:
     that would fool ``contains_google_auth_redirect``.
     """
     response = await client.get(
-        f"{get_base_url()}/?{authuser_query(n)}",
+        get_app_shell_url(authuser_query(n)),
         headers={"User-Agent": _BROWSER_UA, "Accept": "text/html,*/*"},
     )
     if response.status_code != 200:

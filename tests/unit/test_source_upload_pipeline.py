@@ -319,7 +319,10 @@ def test_validate_resumable_upload_url_rejects_untrusted_shapes(url: str, match:
 # a constant personal-host set would let a response header redirect ENTERPRISE
 # file bytes to the consumer service.
 _PERSONAL_HOSTS = ("notebooklm.google.com", "notebook.google.com")
-_ENTERPRISE_HOST = "notebooklm.cloud.google.com"
+_ENTERPRISE_HOST = "notebook.cloud.google.com"
+# The enterprise host serves the app only from a region segment, so its base URL
+# always carries one -- and therefore so does the upload endpoint derived from it.
+_ENTERPRISE_BASE = f"https://{_ENTERPRISE_HOST}/us"
 
 
 @pytest.mark.parametrize("named_host", _PERSONAL_HOSTS)
@@ -338,12 +341,12 @@ def test_validate_resumable_upload_url_pins_enterprise_to_its_own_host(
     monkeypatch: pytest.MonkeyPatch, named_host: str
 ) -> None:
     """An enterprise tenant must reject a consumer-host upload URL (data boundary)."""
-    monkeypatch.setenv("NOTEBOOKLM_BASE_URL", f"https://{_ENTERPRISE_HOST}")
+    monkeypatch.setenv("NOTEBOOKLM_BASE_URL", _ENTERPRISE_BASE)
 
     with pytest.raises(ValidationError, match="host is not trusted"):
         _validate_resumable_upload_url(f"https://{named_host}/upload/_/?upload_id=session")
 
-    own_host_url = f"https://{_ENTERPRISE_HOST}/upload/_/?upload_id=session"
+    own_host_url = f"{_ENTERPRISE_BASE}/upload/_/?upload_id=session"
     assert _validate_resumable_upload_url(own_host_url) == own_host_url
 
 
@@ -357,11 +360,14 @@ def test_validate_resumable_upload_url_pins_enterprise_to_its_own_host(
         "storage.googleapis.com",
     ],
 )
-@pytest.mark.parametrize("configured_host", (*_PERSONAL_HOSTS, _ENTERPRISE_HOST))
+@pytest.mark.parametrize(
+    "configured_base",
+    (*(f"https://{host}" for host in _PERSONAL_HOSTS), _ENTERPRISE_BASE),
+)
 def test_validate_resumable_upload_url_still_rejects_foreign_hosts(
-    monkeypatch: pytest.MonkeyPatch, configured_host: str, named_host: str
+    monkeypatch: pytest.MonkeyPatch, configured_base: str, named_host: str
 ) -> None:
-    monkeypatch.setenv("NOTEBOOKLM_BASE_URL", f"https://{configured_host}")
+    monkeypatch.setenv("NOTEBOOKLM_BASE_URL", configured_base)
 
     with pytest.raises(ValidationError, match="host is not trusted"):
         _validate_resumable_upload_url(f"https://{named_host}/upload/_/?upload_id=session")

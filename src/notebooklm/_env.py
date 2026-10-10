@@ -19,7 +19,30 @@ from ._request_context import policy_env
 
 DEFAULT_BASE_URL = "https://notebook.google.com"
 PERSONAL_BASE_HOST = "notebook.google.com"
-ENTERPRISE_BASE_HOST = "notebooklm.cloud.google.com"
+
+# Gemini Notebook Enterprise (Gemini Enterprise / GCP) app host.
+#
+# Probed live on 2026-09-15. The previous value here, ``notebooklm.cloud.
+# google.com``, is NOT served: every path on it answers with a generic GFE 404,
+# so no request this client made against it could ever have reached the app.
+# ``notebook.cloud.google.com`` is the host Google documents and the one that
+# actually answers -- ``/<region>/`` 302s into the ordinary
+# ``accounts.google.com`` sign-in flow, the same flow the personal hosts use.
+ENTERPRISE_BASE_HOST = "notebook.cloud.google.com"
+
+# Gemini Enterprise serves the app from a REGION-SCOPED PATH, not from the root:
+#
+#     https://notebook.cloud.google.com/<region>/?project=<PROJECT_NUMBER>
+#
+# ``<region>`` is the data-residency multi-region the notebooks live in. It
+# belongs in the base URL because every downstream endpoint hangs off it --
+# batchexecute, the streamed-chat path, and ``/upload/_/`` are all built as
+# ``f"{get_base_url()}{suffix}"`` in ``rpc/types.py``.
+#
+# ``?project=`` deliberately does NOT live in the base URL: it is an app-shell
+# parameter, and folding it in would corrupt every one of those suffix joins.
+# See :func:`get_app_shell_url`.
+ENTERPRISE_REGIONS = frozenset({"us", "eu", "global"})
 
 # The pre-rebrand personal host. Still served, still selectable via
 # ``NOTEBOOKLM_BASE_URL``, and documented as the rollback lever for the #2067
@@ -80,6 +103,26 @@ def validate_base_url(configured: str | None) -> str:
     except ValueError as exc:
         raise ValueError("NOTEBOOKLM_BASE_URL has an invalid port") from exc
     host = parsed.hostname
+
+    # The personal hosts serve the app from the root, so any path on them is a
+    # typo or an injection attempt. The enterprise host is the mirror image: it
+    # serves the app ONLY from a region segment, and its root answers every
+    # request with a generic 404. So the region is required, not optional, and
+    # it must survive into the returned base URL -- dropping it (as this
+    # function did for every path until now) would silently point every RPC at
+    # a host root that cannot answer them.
+    region_path = ""
+    if host == ENTERPRISE_BASE_HOST:
+        segments = [segment for segment in path.split("/") if segment]
+        # Case-folded for the same reason ``urlparse`` folds the hostname: the
+        # region is a fixed keyword, not user data, and ``/US`` is a typo rather
+        # than a different endpoint. The canonical lowercase form is returned.
+        path_accepted = len(segments) == 1 and segments[0].lower() in ENTERPRISE_REGIONS
+        if path_accepted:
+            region_path = f"/{segments[0].lower()}"
+    else:
+        path_accepted = not path
+
     if (
         parsed.scheme != "https"
         or host is None
@@ -87,19 +130,75 @@ def validate_base_url(configured: str | None) -> str:
         or port is not None
         or parsed.username is not None
         or parsed.password is not None
-        or path
+        or not path_accepted
         or parsed.params
         or parsed.query
         or parsed.fragment
     ):
         allowed = ", ".join(sorted(_ALLOWED_BASE_HOSTS))
-        raise ValueError(f"NOTEBOOKLM_BASE_URL must use https and one of: {allowed}")
-    return f"https://{host}"
+        regions = "|".join(sorted(ENTERPRISE_REGIONS))
+        raise ValueError(
+            f"NOTEBOOKLM_BASE_URL must use https and one of: {allowed} "
+            f"(the enterprise host additionally requires a region path, "
+            f"e.g. https://{ENTERPRISE_BASE_HOST}/{{{regions}}})"
+        )
+    return f"https://{host}{region_path}"
 
 
 def get_base_host() -> str:
     """Return the configured NotebookLM host."""
     return urlparse(get_base_url()).hostname or PERSONAL_BASE_HOST
+
+
+def get_enterprise_project() -> str | None:
+    """Return the configured Gemini Enterprise project number, if any.
+
+    Constrained to digits: the value is interpolated into a URL, and a project
+    *number* (not a project ID) is what Google's documented enterprise app-shell
+    address takes.
+    """
+    raw = (policy_env("NOTEBOOKLM_PROJECT_NUMBER") or "").strip()
+    if not raw:
+        return None
+    if not raw.isdigit():
+        raise ValueError("NOTEBOOKLM_PROJECT_NUMBER must be a numeric project number")
+    return raw
+
+
+def is_enterprise_base() -> bool:
+    """True when the configured base URL points at the Gemini Enterprise host.
+
+    Enterprise and the personal hosts serve the *same* batchexecute transport
+    under different boq app names and a different chat proto package, so the
+    endpoint builders in ``rpc.types`` branch on this.
+    """
+    return urlparse(get_base_url()).hostname == ENTERPRISE_BASE_HOST
+
+
+def get_app_shell_url(extra_query: str | None = None) -> str:
+    """Return the URL of the app shell -- the page a browser actually loads.
+
+    This is the login / cookie-priming / token-scraping target, and it is NOT
+    the same as :func:`get_base_url`. On the personal hosts the two differ only
+    by a trailing slash. On Gemini Enterprise the shell additionally carries
+    ``?project=<PROJECT_NUMBER>``, which must not leak into
+    :func:`get_base_url` because the RPC endpoints are built by appending
+    suffixes to it.
+
+    ``extra_query`` is an already-encoded query string (typically
+    ``authuser=N``) to merge in. Callers must pass it here rather than
+    appending their own ``?`` -- on enterprise that would produce a second
+    ``?`` and silently drop the project parameter.
+    """
+    base = get_base_url()
+    params = []
+    if is_enterprise_base():
+        project = get_enterprise_project()
+        if project:
+            params.append(f"project={project}")
+    if extra_query:
+        params.append(extra_query)
+    return f"{base}/?{'&'.join(params)}" if params else f"{base}/"
 
 
 # The frontend build label sent as ``bl`` on the chat streaming endpoint.

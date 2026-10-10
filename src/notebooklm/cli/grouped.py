@@ -88,6 +88,7 @@ class SectionedGroup(click.Group):
                     "skill",
                     "language",
                     "mcp",
+                    "ge",
                 ],
             ),
             ("Artifact Actions (use: notebooklm <action> <type>)", ["generate", "download"]),

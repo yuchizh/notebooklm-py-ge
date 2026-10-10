@@ -78,7 +78,7 @@ def test_keeps_notebooklm_host_cookies() -> None:
             {
                 "name": "Secure-LM",
                 "value": "v2",
-                "domain": ".notebooklm.cloud.google.com",
+                "domain": ".notebook.cloud.google.com",
                 "path": "/",
             },
         ]

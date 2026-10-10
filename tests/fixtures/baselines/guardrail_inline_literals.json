@@ -3,7 +3,7 @@
     "PRIVATE_SYMBOL_ALLOWANCES": 53
   },
   "tests/_guardrails/_public_import_manifest.py": {
-    "_DOCUMENTED_PUBLIC_IMPORTS": 106
+    "_DOCUMENTED_PUBLIC_IMPORTS": 119
   },
   "tests/_guardrails/_wire_contract.py": {
     "ENUM_BINDINGS": 156,

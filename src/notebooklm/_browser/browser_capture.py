@@ -60,7 +60,7 @@ from .._auth.storage import filter_storage_state_cookies_by_domain_policy
 # Importing ``_env`` directly is the established idiom (``_url_utils`` and
 # friends do the same).
 from .._env import PERSONAL_APP_HOSTS
-from ..config import get_base_host, get_base_url
+from ..config import get_app_shell_url, get_base_host
 from ..exceptions import HeadlessLoginRequiredError, LockUnavailableError
 
 # ``CHANNEL_BROWSERS`` and the launch-failure triage live in the
@@ -860,7 +860,7 @@ def run_browser_capture(
                     # would block until timeout. "commit" resolves once response
                     # headers are processed -- enough to land on the host and
                     # classify page.url. See #1697 (and the #214 precedent below).
-                    page.goto(f"{get_base_url()}/", wait_until="commit", timeout=30000)
+                    page.goto(get_app_shell_url(), wait_until="commit", timeout=30000)
                     navigation_committed = True
                     break
                 except PlaywrightError as exc:
@@ -1051,7 +1051,7 @@ def run_browser_capture(
             # Set-Cookie) are processed, before a client-side redirect can
             # interrupt. See #214.
             recovered_during_cookie_forcing = False
-            for url in [GOOGLE_ACCOUNTS_URL, f"{get_base_url()}/"]:
+            for url in [GOOGLE_ACCOUNTS_URL, get_app_shell_url()]:
                 try:
                     page.goto(url, wait_until="commit")
                     navigation_committed = True
@@ -1308,7 +1308,7 @@ def run_cdp_capture(
             # arm -- the default "load" never fires on the app host, so
             # this CDP re-auth goto would otherwise waste 30s then TimeoutError
             # before landing classification. See #1697.
-            page.goto(f"{get_base_url()}/", wait_until="commit", timeout=30000)
+            page.goto(get_app_shell_url(), wait_until="commit", timeout=30000)
 
             # SAME landing classification as the headless launch arm: if we did
             # not land on the NotebookLM host, the attached browser's Google

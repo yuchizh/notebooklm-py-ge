@@ -108,6 +108,7 @@ from .cli import (
     profile,
     register_chat_commands,
     register_doctor_command,
+    register_enterprise_commands,
     register_notebook_commands,
     # Register functions for top-level commands
     register_session_commands,
@@ -254,6 +255,7 @@ register_session_commands(cli)
 register_notebook_commands(cli)
 register_chat_commands(cli)
 register_doctor_command(cli)
+register_enterprise_commands(cli)
 
 # Register command groups (subcommand style)
 cli.add_command(source)

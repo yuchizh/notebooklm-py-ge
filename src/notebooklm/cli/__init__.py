@@ -39,6 +39,7 @@ from .chat_cmd import register_chat_commands
 from .collection_cmd import collection
 from .doctor_cmd import register_doctor_command
 from .download_cmd import download
+from .enterprise_cmd import register_enterprise_commands
 from .generate_cmd import generate
 from .helpers import (
     clear_context,
@@ -117,6 +118,7 @@ __all__ = [
     "register_notebook_commands",
     "register_chat_commands",
     "register_doctor_command",
+    "register_enterprise_commands",
     # Console
     "console",
     # Async

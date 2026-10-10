@@ -30,7 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 AUTH_ROOT = REPO_ROOT / "src" / "notebooklm" / "_auth"
 
 _MODULE_HASHES = {
-    "account.py": "077461a8ff59a6ca94280f9c2023a72d75bee205a2bb3cd65f724c82d24e36f9",
+    "account.py": "307687ba1fba3f03783a818defbd2d8c326565b6848e552ff49856b96dad949d",
     "account_email.py": "ef1acba0e3abab00de5ea243ab4e3f21bb53a21947dc69ab0fabfcd773fcf715",
     "account_repair.py": "4d6cd6af598c26d04bbeed07970708f587f23a24358ccd0125e5883470e8d074",
     "account_types.py": "ae645b74c6d3f46ee9532179672c90d5b690877b900120889022d32d8efa372a",
@@ -44,7 +44,7 @@ _MODULE_HASHES = {
     "profile_store.py": "1ed4945720ba1c25940677cd197210d5c80c62a3b8b6cf7b8f0c1f88783759bd",
     "psidts_recovery.py": "7a4f6891a1a46bd43eff61f3665f1b818d9ced281cabfc381b366cfefa50e03b",
     "recovery.py": "500bb249b58d186ab3e43392ce39c1f1240e31edf7e811b64e0c7340519f2167",
-    "refresh.py": "30e63423793be6ccce76a4e71ce40b0fe0d430226473358a63f44f149e835963",
+    "refresh.py": "e330ec7543560cb6575d1624da87e2a1d06c65f62d8ace642b34e0b7f7a5c44e",
     "single_flight.py": "b48c3efeeaff9d03ddce7c3f50c60ead2e60cfe9f5bd6832a7a7632b03714e44",
     "storage.py": "7c106fc41e4945c82d95fd57c7e29855b7e862e02d8d81db931df3df133f8b1e",
 }

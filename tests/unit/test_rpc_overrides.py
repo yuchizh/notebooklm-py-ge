@@ -336,14 +336,14 @@ def test_resolve_rpc_id_host_resolver_raises_falls_back(monkeypatch):
 
 
 def test_resolve_rpc_id_enterprise_host_allowed(monkeypatch):
-    """The enterprise host (notebooklm.cloud.google.com) also passes the gate."""
+    """The enterprise host (notebook.cloud.google.com) also passes the gate."""
     monkeypatch.setenv("NOTEBOOKLM_RPC_OVERRIDES", '{"LIST_NOTEBOOKS": "ENT_ID"}')
     rpc_overrides._logged_override_hashes.clear()
     # The personal default host is *also* allowlisted, so the override would
     # apply regardless of which allowlisted host the gate sees; spying on the
     # injected resolver proves the gate actually consulted the enterprise host
     # we substituted (and that the seam was hit, not silently bypassed).
-    fake_get_base_host = Mock(return_value="notebooklm.cloud.google.com")
+    fake_get_base_host = Mock(return_value="notebook.cloud.google.com")
     monkeypatch.setattr(_env, "get_base_host", fake_get_base_host)
     assert resolve_rpc_id("LIST_NOTEBOOKS", RPCMethod.LIST_NOTEBOOKS.value) == "ENT_ID"
     fake_get_base_host.assert_called()
